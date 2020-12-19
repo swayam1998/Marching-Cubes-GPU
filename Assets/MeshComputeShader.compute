@@ -1,0 +1,19 @@
+﻿#pragma kernel March
+
+RWStructuredBuffer<float3> _Positions;
+uint _numPointsPerAxis;
+
+int indexFromCoord(uint3 id)
+{
+    return id.z * _numPointsPerAxis * _numPointsPerAxis + id.y * _numPointsPerAxis + id.x;
+}
+
+[numthreads(8,8,8)]
+void March (uint3 id : SV_DispatchThreadID)
+{
+    // TODO: insert actual code here!
+    if(id.x < _numPointsPerAxis && id.y <= _numPointsPerAxis && id.z <= _numPointsPerAxis)
+    {
+        _Positions[indexFromCoord(id)] = float3(id.x, id.y, id.z);
+    }
+}
