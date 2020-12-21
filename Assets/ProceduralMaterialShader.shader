@@ -23,8 +23,8 @@
 
       //buffers
       StructuredBuffer<float3> SphereLocations;
-      StructuredBuffer<int> Triangles;
       StructuredBuffer<float3> Positions;
+      StructuredBuffer<int> Triangles;
 
       //the vertex shader function
       float4 vert(uint vertex_id: SV_VertexID, uint instance_id: SV_InstanceID) : SV_POSITION{

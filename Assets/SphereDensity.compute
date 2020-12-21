@@ -1,14 +1,22 @@
 ﻿// Each #kernel tells which function to compile; you can have many kernels
-#pragma kernel CSMain
+#pragma kernel Density
 
-// Create a RenderTexture with enableRandomWrite flag and set it
-// with cs.SetTexture
-RWTexture2D<float4> Result;
+RWStructuredBuffer<float4> points;
 
-[numthreads(8,8,1)]
-void CSMain (uint3 id : SV_DispatchThreadID)
+unsigned int numPointsPerAxis;
+
+float radius;
+
+int indexFromCoord(int x, int y, int z) {
+    return z * numPointsPerAxis * numPointsPerAxis + y * numPointsPerAxis + x;
+}
+
+[numthreads(8,8,8)]
+void Density (uint3 id : SV_DispatchThreadID)
 {
-    // TODO: insert actual code here!
-
-    Result[id.xy] = float4(id.x & id.y, (id.x & 15)/15.0, (id.y & 15)/15.0, 0.0);
+    if(id.x < numPointsPerAxis && id.y <= numPointsPerAxis && id.z <= numPointsPerAxis)
+    {
+        float density = radius - length(id);
+        points[indexFromCoord(id.x, id.y, id.z)] = float4(id, density);
+    }    
 }

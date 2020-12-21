@@ -9,13 +9,15 @@ public class MeshGenerator : MonoBehaviour
 
     [SerializeField, Range(1,200)]
     int numPointsPerAxis = 20;
-    
-    ComputeBuffer positionsBuffer;
-    ComputeBuffer meshTriangles;
-    ComputeBuffer meshPositions;
 
     [SerializeField]
-    Mesh Mesh = default;
+    float isoLevel = 0;
+
+    [SerializeField]
+    SphereDensity densityGenerator;    
+    ComputeBuffer positionsBuffer;
+    ComputeBuffer meshVertices;
+    ComputeBuffer meshTriangles;
 
     [SerializeField]
     Material Material = default;
@@ -26,6 +28,9 @@ public class MeshGenerator : MonoBehaviour
 
     static readonly int
         positionsId = Shader.PropertyToID("_Positions"),
+        verticesId = Shader.PropertyToID("_Vertices"),
+        trianglesId = Shader.PropertyToID("_Triangles"),
+        isoLevelId = Shader.PropertyToID("isoLevel"),
         numPointsPerAxisId = Shader.PropertyToID("_numPointsPerAxis");
 
     void OnEnable()
@@ -35,39 +40,46 @@ public class MeshGenerator : MonoBehaviour
 
         bounds = new Bounds(Vector3.zero, Vector3.one * 20);
 
-        Vector3[] positions = Mesh.vertices;
-        meshPositions = new ComputeBuffer(positions.Length, sizeof(float) * 3);
-        meshPositions.SetData(positions);
+        densityGenerator.Generate(positionsBuffer, numPointsPerAxis);
+        computeShader.SetBuffer(0, positionsId, positionsBuffer);
+        computeShader.SetBuffer(0, verticesId, meshVertices);
+        //computeShader.SetBuffer(0, trianglesId, meshTriangles);
 
-        int[] triangles = Mesh.triangles;
-        meshTriangles = new ComputeBuffer(triangles.Length, sizeof(int));
-        meshTriangles.SetData(triangles);
+        int[] tris = new int[meshVertices.count];
+        for(int i=0;i<meshVertices.count;i++)
+        {
+            tris[i] = i;
+        }
+        meshTriangles.SetData(tris);
+
+        computeShader.SetInt(numPointsPerAxisId, numPointsPerAxis);
+        computeShader.SetFloat(isoLevelId, isoLevel);
+
+        int groups = Mathf.CeilToInt(numPointsPerAxis / 8f);
+        computeShader.Dispatch(0, groups, groups, groups);
 
         Material.SetBuffer("SphereLocations", positionsBuffer);
+        Material.SetBuffer("Positions", meshVertices);
         Material.SetBuffer("Triangles", meshTriangles);
-        Material.SetBuffer("Positions", meshPositions);
+        
     }
 
     void OnDisable()
     {
         positionsBuffer.Release();
         positionsBuffer = null;
-
-        meshTriangles.Release();
+        
+        meshVertices.Release();
         meshTriangles = null;
 
-        meshPositions.Release();
+        meshTriangles.Release();
         meshTriangles = null;
     }
 
     // Update is called once per frame
     void Update()
     {
-        computeShader.SetBuffer(0, positionsId, positionsBuffer);
-        computeShader.SetInt(numPointsPerAxisId, numPointsPerAxis);
-        int groups = Mathf.CeilToInt(numPointsPerAxis / 8f);
-        computeShader.Dispatch(0, groups, groups, groups);
-
-        Graphics.DrawProcedural(Material, bounds, MeshTopology.Triangles, meshTriangles.count, numPoints);
+        //Debug.Log(meshTriangles.count);
+        Graphics.DrawProcedural(Material, bounds, MeshTopology.Triangles, meshTriangles.count, meshVertices.count);
     }
 }

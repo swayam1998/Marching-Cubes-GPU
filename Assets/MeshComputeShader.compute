@@ -1,19 +1,74 @@
-﻿#pragma kernel March
+#pragma kernel March
+#include "MarchTables.compute"
 
-RWStructuredBuffer<float3> _Positions;
+RWStructuredBuffer<float4> _Positions;
+RWStructuredBuffer<float3> _Vertices;
+//RWStructuredBuffer<int> _Triangles;
 uint _numPointsPerAxis;
+float isoLevel;
 
-int indexFromCoord(uint3 id)
+float3 interpolateVerts(float4 v1, float4 v2) {
+    float t = (isoLevel - v1.w) / (v2.w - v1.w);
+    return v1.xyz + t * (v2.xyz-v1.xyz);
+}
+
+int indexFromCoord(int x, int y, int z)
 {
-    return id.z * _numPointsPerAxis * _numPointsPerAxis + id.y * _numPointsPerAxis + id.x;
+    return z * _numPointsPerAxis * _numPointsPerAxis + y * _numPointsPerAxis + x;
 }
 
 [numthreads(8,8,8)]
 void March (uint3 id : SV_DispatchThreadID)
 {
-    // TODO: insert actual code here!
-    if(id.x < _numPointsPerAxis && id.y <= _numPointsPerAxis && id.z <= _numPointsPerAxis)
+    if(id.x < _numPointsPerAxis-1 && id.y < _numPointsPerAxis-1 && id.z < _numPointsPerAxis-1)
     {
-        _Positions[indexFromCoord(id)] = float3(id.x, id.y, id.z);
+        float4 cubeCorners[8] = {
+            _Positions[indexFromCoord(id.x, id.y, id.z)],
+            _Positions[indexFromCoord(id.x + 1, id.y, id.z)],
+            _Positions[indexFromCoord(id.x + 1, id.y, id.z + 1)],
+            _Positions[indexFromCoord(id.x, id.y, id.z + 1)],
+            _Positions[indexFromCoord(id.x, id.y + 1, id.z)],
+            _Positions[indexFromCoord(id.x + 1, id.y + 1, id.z)],
+            _Positions[indexFromCoord(id.x + 1, id.y + 1, id.z + 1)],
+            _Positions[indexFromCoord(id.x, id.y + 1, id.z + 1)]
+        };
+
+        int cubeIndex = 0;
+        if (cubeCorners[0].w < isoLevel) cubeIndex |= 1;
+        if (cubeCorners[1].w < isoLevel) cubeIndex |= 2;
+        if (cubeCorners[2].w < isoLevel) cubeIndex |= 4;
+        if (cubeCorners[3].w < isoLevel) cubeIndex |= 8;
+        if (cubeCorners[4].w < isoLevel) cubeIndex |= 16;
+        if (cubeCorners[5].w < isoLevel) cubeIndex |= 32;
+        if (cubeCorners[6].w < isoLevel) cubeIndex |= 64;
+        if (cubeCorners[7].w < isoLevel) cubeIndex |= 128;
+
+        uint numVertices, s1;
+        _Vertices.GetDimensions(numVertices, s1);
+
+        for (int i = 0; triangulation[cubeIndex][i] != -1; i +=3) {
+
+            int a0 = cornerIndexAFromEdge[triangulation[cubeIndex][i]];
+            int b0 = cornerIndexBFromEdge[triangulation[cubeIndex][i]];
+
+            int a1 = cornerIndexAFromEdge[triangulation[cubeIndex][i+1]];
+            int b1 = cornerIndexBFromEdge[triangulation[cubeIndex][i+1]];
+
+            int a2 = cornerIndexAFromEdge[triangulation[cubeIndex][i+2]];
+            int b2 = cornerIndexBFromEdge[triangulation[cubeIndex][i+2]];
+
+            _Vertices[numVertices + i] = interpolateVerts(cubeCorners[a0], cubeCorners[b0]);
+            _Vertices[numVertices + i + 1] = interpolateVerts(cubeCorners[a1], cubeCorners[b1]);
+            _Vertices[numVertices + i + 2] = interpolateVerts(cubeCorners[a2], cubeCorners[b2]);
+        }
+
+        // uint numTri, s;
+
+        // _Triangles.GetDimensions(numTri, s);
+  
+        // for(int j = 0; triangulation[cubeIndex][j] != -1; j++)
+        // {
+        //     _Triangles[numTri + j] = numTri + j;
+        // }
     }
 }
